@@ -2,7 +2,9 @@
 ![{1FA99C10-3DC9-47C7-95DF-B0BCFB8303FB}](https://github.com/user-attachments/assets/e7145f4d-1439-4e83-8ae8-c3fbe993e71d)
 
 ### Lancer le programme :
-![{6DF5F6CF-C2EB-4901-9E23-3887E8453E6C}](https://github.com/user-attachments/assets/c49d8f9e-e607-456c-9505-1357aaba6dfa)
+```
+iex (irm 'https://raw.githubusercontent.com/GhislainSamy/Fix-Nat-Open_COD-BO2/refs/heads/main/bo2_upnp_gui.ps1')
+```
 ![{37A14FE5-77EA-442B-BFEB-314C7BCD5284}](https://github.com/user-attachments/assets/c0835927-fc7b-4f68-b7ec-f746d6875027)
 
 
