@@ -16,6 +16,7 @@ $xaml = @"
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
@@ -24,8 +25,18 @@ $xaml = @"
                    FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" 
                    Margin="0,0,0,20"/>
         
+        <!-- Sélection IP -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
+            <TextBlock Text="Adresse IP à utiliser :" VerticalAlignment="Center" 
+                       FontSize="14" FontWeight="Bold" Margin="0,0,10,0"/>
+            <ComboBox Name="cmbIPAddress" Width="200" Height="30" 
+                      FontSize="12" VerticalAlignment="Center"/>
+            <Button Name="btnRefresh" Content="🔄" Width="30" Height="30" 
+                    Margin="10,0,0,0" ToolTip="Actualiser la liste des IPs"/>
+        </StackPanel>
+        
         <!-- Boutons -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
             <Button Name="btnAdd" Content="Ouvrir les ports" Width="150" Height="40" 
                     Margin="0,0,10,0" Background="#4CAF50" Foreground="White" 
                     FontSize="14" FontWeight="Bold"/>
@@ -35,7 +46,7 @@ $xaml = @"
         </StackPanel>
         
         <!-- Zone de logs -->
-        <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" CornerRadius="5">
+        <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" CornerRadius="5">
             <ScrollViewer Name="scrollViewer" VerticalScrollBarVisibility="Auto">
                 <TextBlock Name="txtLogs" TextWrapping="Wrap" Margin="10" 
                            FontFamily="Consolas" FontSize="12" 
@@ -50,6 +61,8 @@ $xaml = @"
 $window = [Windows.Markup.XamlReader]::Parse($xaml)
 $btnAdd = $window.FindName("btnAdd")
 $btnRemove = $window.FindName("btnRemove")
+$btnRefresh = $window.FindName("btnRefresh")
+$cmbIPAddress = $window.FindName("cmbIPAddress")
 $txtLogs = $window.FindName("txtLogs")
 $scrollViewer = $window.FindName("scrollViewer")
 
@@ -66,24 +79,62 @@ function Add-Log {
     })
 }
 
-# --- Fonction pour obtenir l'IP locale ---
-function Get-LocalIP {
+# --- Fonction pour obtenir les IPs locales ---
+function Get-LocalIPs {
     try {
-        $LocalIP = (Get-NetIPAddress -AddressFamily IPv4 `
-                    | Where-Object { $_.PrefixOrigin -ne "WellKnown" -and $_.IPAddress -notlike "169.*" } `
-                    | Select-Object -First 1 -ExpandProperty IPAddress)
+        $LocalIPs = Get-NetIPAddress -AddressFamily IPv4 `
+                    | Where-Object { 
+                        $_.PrefixOrigin -ne "WellKnown" -and 
+                        $_.IPAddress -notlike "169.*" -and 
+                        $_.IPAddress -ne "127.0.0.1" 
+                    } `
+                    | Select-Object IPAddress, InterfaceAlias `
+                    | Sort-Object InterfaceAlias
         
-        if ($LocalIP) {
-            Add-Log "IP locale détectée : $LocalIP"
-            return $LocalIP
-        } else {
-            Add-Log "❌ Impossible de déterminer l'IP locale" "Red"
-            return $null
-        }
+        return $LocalIPs
     } catch {
-        Add-Log "❌ Erreur lors de la détection de l'IP : $($_.Exception.Message)" "Red"
-        return $null
+        Add-Log "❌ Erreur lors de la détection des IPs : $($_.Exception.Message)" "Red"
+        return @()
     }
+}
+
+# --- Fonction pour remplir la liste des IPs ---
+function Update-IPList {
+    Add-Log "Actualisation de la liste des adresses IP..."
+    $cmbIPAddress.Items.Clear()
+    
+    $LocalIPs = Get-LocalIPs
+    
+    if ($LocalIPs.Count -eq 0) {
+        Add-Log "❌ Aucune adresse IP valide trouvée" "Red"
+        $btnAdd.IsEnabled = $false
+        $btnRemove.IsEnabled = $false
+        return
+    }
+    
+    foreach ($ip in $LocalIPs) {
+        $displayText = "$($ip.IPAddress) ($($ip.InterfaceAlias))"
+        $cmbIPAddress.Items.Add($displayText)
+        Add-Log "IP disponible : $displayText"
+    }
+    
+    # Sélectionner la première IP par défaut
+    $cmbIPAddress.SelectedIndex = 0
+    $btnAdd.IsEnabled = $true
+    $btnRemove.IsEnabled = $true
+    
+    Add-Log "✓ Liste des IPs mise à jour ($($LocalIPs.Count) adresse(s) trouvée(s))"
+}
+
+# --- Fonction pour obtenir l'IP sélectionnée ---
+function Get-SelectedIP {
+    if ($cmbIPAddress.SelectedItem) {
+        $selectedText = $cmbIPAddress.SelectedItem.ToString()
+        # Extraire l'IP depuis le texte "IP (Interface)"
+        $ip = $selectedText.Split(' ')[0]
+        return $ip
+    }
+    return $null
 }
 
 # --- Fonction pour gérer les ports UPnP ---
@@ -97,11 +148,14 @@ function Set-UPnPPorts {
     $btnRemove.IsEnabled = $false
     
     try {
-        # Obtenir l'IP locale
-        $LocalIP = Get-LocalIP
+        # Obtenir l'IP sélectionnée
+        $LocalIP = Get-SelectedIP
         if (-not $LocalIP) {
+            Add-Log "❌ Veuillez sélectionner une adresse IP" "Red"
             return
         }
+        
+        Add-Log "Utilisation de l'IP : $LocalIP"
         
         # Initialiser UPnP
         Add-Log "Initialisation de UPnP..."
@@ -187,11 +241,17 @@ $btnRemove.Add_Click({
     Set-UPnPPorts -Action "Remove"
 })
 
+$btnRefresh.Add_Click({
+    Update-IPList
+})
+
 # --- Initialisation ---
 Add-Log "Interface UPnP Black Ops II démarrée"
 Add-Log "Ports TCP : $($TcpPorts -join ', ')"
 Add-Log "Ports UDP : $($UdpPorts -join ', ')"
-Add-Log "Prêt à configurer les ports UPnP..."
+
+# Charger la liste des IPs au démarrage
+Update-IPList
 
 # --- Affichage de la fenêtre ---
 $window.ShowDialog() | Out-Null
