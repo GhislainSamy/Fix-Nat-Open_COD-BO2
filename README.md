@@ -5,6 +5,10 @@
 
 > [!IMPORTANT]
 > Télécharger le programme depuis la page de releases.
+> 
+> Activer l'exécution de script powershell via la commande :
+> 
+> Set-ExecutionPolicy unrestricted
 
 ![{DC35292E-E768-4F33-9D8A-A7F6C311AD47}](https://github.com/user-attachments/assets/b213185e-f28f-44d1-807c-c0e2eb0bf336)
 
@@ -22,7 +26,7 @@
 > La prise en compte par le jeux est long.
 
 > [!IMPORTANT]
-> Redémarrer l'ordinateur permet d'aller plus vite.
+> Redémarrer l'ordinateur pour aller plus vite.
 
 ### Résultat :
 ![{45530CCC-4281-46D5-A9AE-E40C69E48429}](https://github.com/user-attachments/assets/f25a7059-d67d-4f70-9221-d50637f13add)
